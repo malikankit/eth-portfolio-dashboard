@@ -1,6 +1,6 @@
 # ETH Portfolio Dashboard
 
-Enter an Ethereum address to view its ETH + ERC-20 token portfolio — for today, or for any past date via the date picker.
+Enter an EVM address to view its native + ERC-20 token portfolio across Ethereum, Base, and Arbitrum — for today, or for any past date via the date picker.
 
 ## Setup
 
@@ -27,7 +27,11 @@ Enter an Ethereum address to view its ETH + ERC-20 token portfolio — for today
 ## How it works
 
 - `app/api/portfolio/route.ts` — server route that validates the address/date and calls GoldRush, keeping the API key server-side.
-- `lib/goldrush/client.ts` — GoldRush API client. Uses `balances_v2` for the current date, and `portfolio_v2` (historical daily snapshots) for past dates.
-- `components/PortfolioDashboard.tsx` — client component wiring the address input, date picker, and results view together.
+- `lib/goldrush/chains.ts` — the chains queried: Ethereum, Base, Arbitrum (each an EVM chain, same 0x address across all three).
+- `lib/goldrush/client.ts` — GoldRush API client. Fans out to all three chains in parallel with `Promise.allSettled`:
+  - No date (today) → `balances_v2` (current balances, works on every chain).
+  - Past date → `historical_balances` with `date=YYYY-MM-DD`. GoldRush resolves the date to the correct block internally — no manual block-height lookup needed.
+  - If a chain's request fails (e.g. `historical_balances` isn't supported on Arbitrum on the current plan — confirmed via live testing), that chain is dropped and reported in `chainErrors` rather than failing the whole response.
+- `components/PortfolioView.tsx` — shows total value, a per-chain USD breakdown, any partial-failure warnings, and the full token table (each row tagged with its chain; native ETH shows up as a normal row per chain).
 
-**Note:** The historical endpoint's exact field names were sourced from GoldRush's public docs but haven't been verified against a live response yet. Once you have an API key, test a request with a past date — if the response shape differs from what's in `lib/goldrush/client.ts`, that file is the only place that needs adjusting.
+**Known limitation:** `historical_balances` currently 501s on Arbitrum for this API key/plan — Arbitrum historical data will show up in `chainErrors` until GoldRush enables it or a different endpoint/workaround is used.

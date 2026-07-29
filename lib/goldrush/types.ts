@@ -8,6 +8,20 @@ export interface TokenHolding {
   valueUsd: number;
   logoUrl: string | null;
   isNativeToken: boolean;
+  chainId: number;
+  chainLabel: string;
+}
+
+export interface ChainBreakdown {
+  chainId: number;
+  chainLabel: string;
+  valueUsd: number;
+}
+
+export interface ChainError {
+  chainId: number;
+  chainLabel: string;
+  message: string;
 }
 
 export interface PortfolioResult {
@@ -15,4 +29,6 @@ export interface PortfolioResult {
   date: string;
   totalValueUsd: number;
   tokens: TokenHolding[];
+  chainBreakdown: ChainBreakdown[];
+  chainErrors: ChainError[];
 }

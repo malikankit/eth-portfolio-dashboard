@@ -17,7 +17,23 @@ export function PortfolioView({ portfolio }: PortfolioViewProps) {
         <div className="text-3xl font-semibold text-neutral-900 dark:text-neutral-100">
           {formatUsd(portfolio.totalValueUsd)}
         </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {portfolio.chainBreakdown.map((chain) => (
+            <div
+              key={chain.chainId}
+              className="rounded-md bg-neutral-100 px-3 py-1 text-xs text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400"
+            >
+              {chain.chainLabel}: {formatUsd(chain.valueUsd)}
+            </div>
+          ))}
+        </div>
       </div>
+
+      {portfolio.chainErrors.length > 0 && (
+        <p className="rounded-md bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+          Couldn&apos;t load: {portfolio.chainErrors.map((e) => `${e.chainLabel} (${e.message})`).join(", ")}
+        </p>
+      )}
 
       {sortedTokens.length === 0 ? (
         <p className="text-sm text-neutral-500 dark:text-neutral-400">
@@ -29,6 +45,7 @@ export function PortfolioView({ portfolio }: PortfolioViewProps) {
             <thead className="bg-neutral-50 text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
               <tr>
                 <th className="px-4 py-2 font-medium">Token</th>
+                <th className="px-4 py-2 font-medium">Chain</th>
                 <th className="px-4 py-2 font-medium">Balance</th>
                 <th className="px-4 py-2 font-medium">Price</th>
                 <th className="px-4 py-2 text-right font-medium">Value</th>
@@ -37,7 +54,7 @@ export function PortfolioView({ portfolio }: PortfolioViewProps) {
             <tbody>
               {sortedTokens.map((token) => (
                 <tr
-                  key={token.contractAddress}
+                  key={`${token.chainId}-${token.contractAddress}`}
                   className="border-t border-neutral-200 dark:border-neutral-800"
                 >
                   <td className="px-4 py-2">
@@ -47,6 +64,9 @@ export function PortfolioView({ portfolio }: PortfolioViewProps) {
                     <div className="text-xs text-neutral-500 dark:text-neutral-400">
                       {token.name}
                     </div>
+                  </td>
+                  <td className="px-4 py-2 text-neutral-700 dark:text-neutral-300">
+                    {token.chainLabel}
                   </td>
                   <td className="px-4 py-2 text-neutral-700 dark:text-neutral-300">
                     {formatTokenAmount(token.balance, token.decimals)}
