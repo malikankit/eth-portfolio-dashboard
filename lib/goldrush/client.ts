@@ -18,7 +18,7 @@ interface RawTokenItem {
   balance: string | null;
   quote: number | null;
   quote_rate: number | null;
-  logo_url: string | null;
+  logo_urls: { token_logo_url: string | null } | null;
   is_native_token: boolean | null;
 }
 
@@ -78,24 +78,23 @@ async function callGoldRush<T>(path: string, params: Record<string, string>): Pr
     url.searchParams.set(key, value);
   }
 
+  const basicAuth = Buffer.from(`${getApiKey()}:`).toString("base64");
   const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${getApiKey()}` },
+    headers: { Authorization: `Basic ${basicAuth}` },
     cache: "no-store",
   });
 
-  if (!res.ok) {
-    throw new GoldRushError(
-      `GoldRush API request failed (${res.status})`,
-      res.status === 401 ? 500 : 502,
-    );
+  let envelope: GoldRushEnvelope<T> | null = null;
+  try {
+    envelope = await res.json();
+  } catch {
+    envelope = null;
   }
 
-  const envelope: GoldRushEnvelope<T> = await res.json();
-  if (envelope.error || !envelope.data) {
-    throw new GoldRushError(
-      envelope.error_message ?? "GoldRush API returned an error",
-      502,
-    );
+  if (!res.ok || !envelope || envelope.error || !envelope.data) {
+    const message = envelope?.error_message ?? `GoldRush API request failed (${res.status})`;
+    const status = res.status >= 400 && res.status < 500 ? 400 : 502;
+    throw new GoldRushError(message, status);
   }
   return envelope.data;
 }
@@ -139,7 +138,7 @@ export async function getCurrentPortfolio(address: string): Promise<PortfolioRes
       item.balance,
       item.quote_rate,
       item.quote,
-      item.logo_url,
+      item.logo_urls?.token_logo_url ?? null,
       item.is_native_token,
     ),
   );
