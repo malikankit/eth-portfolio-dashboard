@@ -30,8 +30,6 @@ Enter an EVM address to view its native + ERC-20 token portfolio across Ethereum
 - `lib/goldrush/chains.ts` — the chains queried: Ethereum, Base, Arbitrum (each an EVM chain, same 0x address across all three).
 - `lib/goldrush/client.ts` — GoldRush API client. Fans out to all three chains in parallel with `Promise.allSettled`:
   - No date (today) → `balances_v2` (current balances, works on every chain).
-  - Past date → `historical_balances` with `date=YYYY-MM-DD`. GoldRush resolves the date to the correct block internally — no manual block-height lookup needed.
-  - If a chain's request fails (e.g. `historical_balances` isn't supported on Arbitrum on the current plan — confirmed via live testing), that chain is dropped and reported in `chainErrors` rather than failing the whole response.
+  - Past date → `historical_balances` with `date=YYYY-MM-DD`. GoldRush resolves the date to the correct block internally — no manual block-height lookup needed. If a chain doesn't support this endpoint (Arbitrum currently 501s on it for this plan), the client automatically falls back to `portfolio_v2` (daily snapshots) for that chain only.
+  - If a chain's request fails outright, that chain is dropped and reported in `chainErrors` rather than failing the whole response.
 - `components/PortfolioView.tsx` — shows total value, a per-chain USD breakdown, any partial-failure warnings, and the full token table (each row tagged with its chain; native ETH shows up as a normal row per chain).
-
-**Known limitation:** `historical_balances` currently 501s on Arbitrum for this API key/plan — Arbitrum historical data will show up in `chainErrors` until GoldRush enables it or a different endpoint/workaround is used.
