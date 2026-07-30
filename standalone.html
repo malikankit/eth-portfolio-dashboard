@@ -159,6 +159,27 @@
     <p id="corsResult" class="status-line"></p>
   </fieldset>
 
+  <section>
+    <div class="section-header">
+      <h2>Backup &amp; restore</h2>
+    </div>
+    <p class="hint">
+      Export everything this page has stored in this browser — recent lookups, confirmed lookup history, the spam
+      list, and the audit log — to a single JSON file, and re-import it later (e.g. after clearing localStorage, or
+      on a new browser/device). Importing <strong>merges</strong> with what's already here, matched by key with the
+      newest entry winning, rather than overwriting. The API key is deliberately left out of this export since it's
+      a credential — save/re-enter that separately.
+    </p>
+    <div class="row">
+      <button type="button" id="downloadFullBackup">Download full backup (JSON)</button>
+      <label class="secondary" style="display:inline-flex; align-items:center; gap:0.5rem; border:1px solid var(--border); border-radius:0.375rem; padding:0.55rem 1.1rem; font-size:0.875rem; cursor:pointer;">
+        Import backup…
+        <input type="file" id="importBackupFile" accept="application/json" style="display:none;" />
+      </label>
+    </div>
+    <p id="backupStatus" class="status-line"></p>
+  </section>
+
   <form id="portfolioForm">
     <div class="row">
       <label>
@@ -388,6 +409,7 @@
   const spamCountEl = $("spamCount");
   const auditListEl = $("auditList");
   const auditCountEl = $("auditCount");
+  const backupStatusEl = $("backupStatus");
   const selectAllBtn = $("selectAllBtn");
   const deselectAllBtn = $("deselectAllBtn");
   const reviewSelectionCount = $("reviewSelectionCount");
@@ -1291,6 +1313,24 @@
     );
   }
 
+  function sanitizeFilenamePart(s) {
+    return String(s ?? "").trim().replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "unlabeled";
+  }
+
+  function buildEntryBackup(entry) {
+    const rawLookup = rawCache.find((c) => c.key === entry.key) || null;
+    const addressLower = entry.address.toLowerCase();
+    const relatedAuditLogEntries = auditLog.filter(
+      (a) => a.address && a.address.toLowerCase() === addressLower && (a.date ? a.date === entry.date : true),
+    );
+    return {
+      exportedAt: new Date().toISOString(),
+      confirmedEntry: entry,
+      rawLookup,
+      relatedAuditLogEntries,
+    };
+  }
+
   function renderConfirmedList() {
     confirmedCountEl.textContent = confirmedEntries.length ? `(${confirmedEntries.length})` : "";
     if (!confirmedEntries.length) {
@@ -1314,6 +1354,7 @@
             <button type="button" class="small" data-action="edit" data-key="${escapeAttr(entry.key)}">Edit</button>
             <button type="button" class="small" data-action="csv" data-key="${escapeAttr(entry.key)}">CSV</button>
             <button type="button" class="small" data-action="json" data-key="${escapeAttr(entry.key)}">JSON</button>
+            <button type="button" class="small" data-action="backup" data-key="${escapeAttr(entry.key)}">Full backup</button>
             <button type="button" class="small danger" data-action="delete" data-key="${escapeAttr(entry.key)}">Delete</button>
           </div>
         </td>
@@ -1344,6 +1385,9 @@
       downloadBlob(`lookup_${entry.address}_${entry.date}.csv`, entryToCsv(entry), "text/csv");
     } else if (action === "json") {
       downloadBlob(`lookup_${entry.address}_${entry.date}.json`, entryToJson(entry), "application/json");
+    } else if (action === "backup") {
+      const filename = `${sanitizeFilenamePart(entry.addressMeta?.externalLabel)}_${sanitizeFilenamePart(entry.address)}_${sanitizeFilenamePart(entry.date)}_exported.json`;
+      downloadBlob(filename, JSON.stringify(buildEntryBackup(entry), null, 2), "application/json");
     } else if (action === "delete") {
       if (!confirm(`Delete confirmed lookup for ${entry.address} on ${entry.date}?`)) return;
       confirmedEntries = confirmedEntries.filter((x) => x.key !== entry.key);
@@ -1358,6 +1402,89 @@
     confirmedEntries = [];
     saveJSON(CONFIRMED_STORAGE, confirmedEntries);
     renderConfirmedList();
+  });
+
+  // --- full backup / restore (everything except the API key) ---
+
+  function mergeByKey(existing, incoming, keyFn, tsFn) {
+    const map = new Map();
+    for (const item of existing) map.set(keyFn(item), item);
+    for (const item of incoming) {
+      const k = keyFn(item);
+      const cur = map.get(k);
+      if (!cur || String(tsFn(item) || "") > String(tsFn(cur) || "")) map.set(k, item);
+    }
+    return [...map.values()];
+  }
+
+  $("downloadFullBackup").addEventListener("click", () => {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      version: 1,
+      rawCache,
+      confirmedEntries,
+      spamTokens,
+      auditLog,
+    };
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    downloadBlob(`goldrush-dashboard-backup-${stamp}.json`, JSON.stringify(payload, null, 2), "application/json");
+    backupStatusEl.textContent =
+      `Downloaded backup with ${rawCache.length} lookup(s), ${confirmedEntries.length} confirmed entr(ies), ` +
+      `${spamTokens.length} spam token(s), ${auditLog.length} audit log entr(ies).`;
+  });
+
+  $("importBackupFile").addEventListener("change", async (evt) => {
+    const file = evt.target.files?.[0];
+    evt.target.value = "";
+    if (!file) return;
+    let data;
+    try {
+      data = JSON.parse(await file.text());
+    } catch (err) {
+      backupStatusEl.textContent = `Import failed: not valid JSON (${err.message}).`;
+      return;
+    }
+    if (typeof data !== "object" || data === null) {
+      backupStatusEl.textContent = "Import failed: file doesn't look like a backup.";
+      return;
+    }
+
+    const before = {
+      rawCache: rawCache.length,
+      confirmedEntries: confirmedEntries.length,
+      spamTokens: spamTokens.length,
+      auditLog: auditLog.length,
+    };
+
+    rawCache = mergeByKey(rawCache, Array.isArray(data.rawCache) ? data.rawCache : [], (x) => x.key, (x) => x.fetchedAt);
+    rawCache.sort((a, b) => String(b.fetchedAt).localeCompare(String(a.fetchedAt)));
+    if (rawCache.length > RAW_CACHE_LIMIT) rawCache = rawCache.slice(0, RAW_CACHE_LIMIT);
+    saveJSON(RAW_CACHE_STORAGE, rawCache);
+
+    confirmedEntries = mergeByKey(confirmedEntries, Array.isArray(data.confirmedEntries) ? data.confirmedEntries : [], (x) => x.key, (x) => x.confirmedAt);
+    saveJSON(CONFIRMED_STORAGE, confirmedEntries);
+
+    spamTokens = mergeByKey(
+      spamTokens,
+      Array.isArray(data.spamTokens) ? data.spamTokens : [],
+      (t) => spamMatchKey(t.chainId, t.contractAddress),
+      (t) => t.markedAt,
+    );
+    saveJSON(SPAM_STORAGE, spamTokens);
+
+    auditLog = mergeByKey(auditLog, Array.isArray(data.auditLog) ? data.auditLog : [], (x) => x.id, (x) => x.timestamp);
+    auditLog.sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)));
+    if (auditLog.length > AUDIT_LIMIT) auditLog = auditLog.slice(0, AUDIT_LIMIT);
+    saveJSON(AUDIT_STORAGE, auditLog);
+
+    renderRawCacheList();
+    renderConfirmedList();
+    renderSpamList();
+    renderAuditLog();
+
+    backupStatusEl.textContent =
+      `Imported and merged — recent lookups ${before.rawCache}→${rawCache.length}, confirmed ${before.confirmedEntries}→${confirmedEntries.length}, ` +
+      `spam tokens ${before.spamTokens}→${spamTokens.length}, audit log ${before.auditLog}→${auditLog.length}.`;
   });
 
   // --- main form ---
