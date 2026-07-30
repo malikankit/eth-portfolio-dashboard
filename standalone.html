@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ETH Portfolio Dashboard (standalone)</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fafafa;
+    --fg: #171717;
+    --muted: #737373;
+    --border: #e5e5e5;
+    --card: #ffffff;
+    --pill: #f5f5f5;
+    --accent: #171717;
+    --accent-fg: #ffffff;
+    --warn-bg: #fffbeb;
+    --warn-fg: #92400e;
+    --err-bg: #fef2f2;
+    --err-fg: #b91c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0a0a0a;
+      --fg: #f5f5f5;
+      --muted: #a3a3a3;
+      --border: #262626;
+      --card: #111111;
+      --pill: #171717;
+      --accent: #f5f5f5;
+      --accent-fg: #171717;
+      --warn-bg: #451a03;
+      --warn-fg: #fcd34d;
+      --err-bg: #450a0a;
+      --err-fg: #fca5a5;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 4rem 1rem;
+  }
+  main { width: 100%; max-width: 48rem; display: flex; flex-direction: column; gap: 2rem; }
+  h1 { font-size: 1.5rem; font-weight: 600; text-align: center; margin: 0; }
+  .subtitle { font-size: 0.875rem; color: var(--muted); text-align: center; margin: 0.5rem 0 0; }
+  header { display: flex; flex-direction: column; align-items: center; }
+  fieldset {
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  legend { font-size: 0.8rem; font-weight: 600; color: var(--muted); padding: 0 0.4rem; }
+  label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.875rem; font-weight: 500; }
+  input, select {
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--fg);
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    font-family: inherit;
+  }
+  input[type="text"].mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
+  .row > label { flex: 1; min-width: 12rem; }
+  button {
+    border: none;
+    border-radius: 0.375rem;
+    background: var(--accent);
+    color: var(--accent-fg);
+    padding: 0.55rem 1.1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    height: fit-content;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.secondary { background: transparent; color: var(--fg); border: 1px solid var(--border); }
+  .hint { font-size: 0.75rem; color: var(--muted); }
+  .banner { border-radius: 0.375rem; padding: 0.6rem 1rem; font-size: 0.875rem; }
+  .banner.warn { background: var(--warn-bg); color: var(--warn-fg); }
+  .banner.err { background: var(--err-bg); color: var(--err-fg); }
+  .card { border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem; background: var(--card); }
+  .total-label { font-size: 0.875rem; color: var(--muted); }
+  .total-value { font-size: 1.9rem; font-weight: 600; }
+  .pills { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+  .pill { background: var(--pill); border-radius: 0.375rem; padding: 0.25rem 0.6rem; font-size: 0.75rem; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  thead { background: var(--pill); color: var(--muted); }
+  th, td { padding: 0.5rem 1rem; text-align: left; }
+  th:last-child, td:last-child { text-align: right; }
+  tbody tr { border-top: 1px solid var(--border); }
+  .token-name { font-size: 0.75rem; color: var(--muted); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 0.5rem; }
+  .empty { font-size: 0.875rem; color: var(--muted); }
+  .status-line { font-size: 0.75rem; color: var(--muted); }
+  details summary { cursor: pointer; font-size: 0.8rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>ETH Portfolio Dashboard</h1>
+    <p class="subtitle">Standalone build — calls GoldRush (Covalent) directly from your browser, no backend.</p>
+  </header>
+
+  <fieldset>
+    <legend>API settings</legend>
+    <label>
+      GoldRush API key
+      <input type="password" id="apiKey" class="mono" placeholder="cqt_..." autocomplete="off" />
+    </label>
+    <div class="row">
+      <button type="button" id="saveKey">Save key locally</button>
+      <button type="button" id="clearKey" class="secondary">Clear</button>
+      <button type="button" id="testCors" class="secondary">Test connection / CORS</button>
+    </div>
+    <p class="hint">
+      Stored only in this browser's <code>localStorage</code> — never sent anywhere but
+      <code>api.covalenthq.com</code>. Anyone with access to this browser/tab can read it, so don't use this
+      file on a shared or public machine with a production key.
+    </p>
+    <p id="corsResult" class="status-line"></p>
+  </fieldset>
+
+  <form id="portfolioForm">
+    <div class="row">
+      <label>
+        Ethereum address
+        <input type="text" id="address" class="mono" placeholder="0x..." spellcheck="false" />
+      </label>
+      <label>
+        Portfolio date
+        <input type="date" id="date" />
+      </label>
+      <button type="submit" id="submitBtn">View portfolio</button>
+    </div>
+  </form>
+
+  <div id="messages"></div>
+  <div id="results"></div>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  const BASE_URL = "https://api.covalenthq.com/v1";
+  const MAX_LOOKBACK_DAYS = 365 * 2;
+  const CHAINS = [
+    { id: "eth-mainnet", chainId: 1, label: "Ethereum" },
+    { id: "base-mainnet", chainId: 8453, label: "Base" },
+    { id: "arbitrum-mainnet", chainId: 42161, label: "Arbitrum" },
+  ];
+  const STORAGE_KEY = "goldrush_api_key";
+
+  const $ = (id) => document.getElementById(id);
+  const apiKeyInput = $("apiKey");
+  const dateInput = $("date");
+  const addressInput = $("address");
+  const form = $("portfolioForm");
+  const submitBtn = $("submitBtn");
+  const messagesEl = $("messages");
+  const resultsEl = $("results");
+  const corsResultEl = $("corsResult");
+
+  dateInput.max = new Date().toISOString().slice(0, 10);
+  dateInput.value = dateInput.max;
+
+  const savedKey = localStorage.getItem(STORAGE_KEY);
+  if (savedKey) apiKeyInput.value = savedKey;
+
+  $("saveKey").addEventListener("click", () => {
+    localStorage.setItem(STORAGE_KEY, apiKeyInput.value.trim());
+    corsResultEl.textContent = "Key saved to localStorage.";
+  });
+  $("clearKey").addEventListener("click", () => {
+    localStorage.removeItem(STORAGE_KEY);
+    apiKeyInput.value = "";
+    corsResultEl.textContent = "Key cleared.";
+  });
+
+  $("testCors").addEventListener("click", async () => {
+    corsResultEl.textContent = "Testing…";
+    const key = apiKeyInput.value.trim();
+    if (!key) {
+      corsResultEl.textContent = "Enter an API key first.";
+      return;
+    }
+    try {
+      const res = await callGoldRushRaw(
+        "/eth-mainnet/address/0x0000000000000000000000000000000000000000/balances_v2/",
+        { "quote-currency": "USD" },
+        key,
+      );
+      corsResultEl.textContent =
+        `No CORS issue — got HTTP ${res.status} directly from the browser. ` +
+        `GoldRush sends permissive CORS headers, so this file can call the API with no proxy.`;
+    } catch (err) {
+      corsResultEl.textContent =
+        "Request failed before a response was readable — this usually means an actual CORS/network " +
+        "block rather than an API error (API errors like 401 still return normally): " + err.message;
+    }
+  });
+
+  function authHeader(key) {
+    return "Basic " + btoa(`${key}:`);
+  }
+
+  async function callGoldRushRaw(path, params, key) {
+    const url = new URL(BASE_URL + path);
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+    return fetch(url.toString(), {
+      headers: { Authorization: authHeader(key) },
+      cache: "no-store",
+    });
+  }
+
+  class GoldRushError extends Error {
+    constructor(message, status, upstreamCode) {
+      super(message);
+      this.name = "GoldRushError";
+      this.status = status;
+      this.upstreamCode = upstreamCode ?? null;
+    }
+  }
+
+  async function callGoldRush(path, params, key) {
+    const res = await callGoldRushRaw(path, params, key);
+    let envelope = null;
+    try {
+      envelope = await res.json();
+    } catch {
+      envelope = null;
+    }
+    if (!res.ok || !envelope || envelope.error || !envelope.data) {
+      const message = envelope?.error_message ?? `GoldRush API request failed (${res.status})`;
+      const status = res.status >= 400 && res.status < 500 ? 400 : 502;
+      throw new GoldRushError(message, status, envelope?.error_code ?? null);
+    }
+    return envelope.data;
+  }
+
+  function toTokenHolding(item, chain, overrides) {
+    overrides = overrides || {};
+    return {
+      contractAddress: item.contract_address,
+      name: item.contract_name ?? "Unknown Token",
+      symbol: item.contract_ticker_symbol ?? "?",
+      decimals: item.contract_decimals ?? 18,
+      balance: overrides.balance !== undefined ? overrides.balance : (item.balance ?? "0"),
+      quoteRate: overrides.quoteRate !== undefined ? overrides.quoteRate : item.quote_rate,
+      valueUsd: overrides.valueUsd !== undefined ? (overrides.valueUsd ?? 0) : (item.quote ?? 0),
+      logoUrl: overrides.logoUrl !== undefined ? overrides.logoUrl : (item.logo_urls?.token_logo_url ?? null),
+      isNativeToken: item.is_native_token ?? false,
+      chainId: chain.chainId,
+      chainLabel: chain.label,
+    };
+  }
+
+  async function fetchCurrentBalances(chain, address, key) {
+    const data = await callGoldRush(
+      `/${chain.id}/address/${address}/balances_v2/`,
+      { "quote-currency": "USD", "no-spam": "true" },
+      key,
+    );
+    return data.items.map((item) => toTokenHolding(item, chain));
+  }
+
+  async function fetchHistoricalBalances(chain, address, date, key) {
+    const data = await callGoldRush(
+      `/${chain.id}/address/${address}/historical_balances/`,
+      { "quote-currency": "USD", "no-spam": "true", date },
+      key,
+    );
+    return data.items.map((item) => toTokenHolding(item, chain));
+  }
+
+  function findSnapshotForDate(holdings, date) {
+    let best = null;
+    for (const snapshot of holdings) {
+      const snapshotDate = snapshot.timestamp.slice(0, 10);
+      if (snapshotDate === date) return snapshot;
+      if (snapshotDate < date && (!best || snapshotDate > best.timestamp.slice(0, 10))) {
+        best = snapshot;
+      }
+    }
+    return best;
+  }
+
+  async function fetchHistoricalViaSnapshots(chain, address, date, key) {
+    const target = new Date(`${date}T00:00:00Z`);
+    const today = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00Z");
+    const daysBack = Math.round((today.getTime() - target.getTime()) / 86_400_000);
+
+    if (daysBack > MAX_LOOKBACK_DAYS) {
+      throw new GoldRushError(
+        `Date is too far in the past (max ${MAX_LOOKBACK_DAYS} days of history supported).`,
+        400,
+      );
+    }
+
+    const data = await callGoldRush(
+      `/${chain.id}/address/${address}/portfolio_v2/`,
+      { "quote-currency": "USD", days: String(Math.max(daysBack + 1, 1)) },
+      key,
+    );
+
+    const tokens = [];
+    for (const item of data.items) {
+      const snapshot = findSnapshotForDate(item.holdings, date);
+      if (!snapshot) continue;
+      tokens.push(
+        toTokenHolding(item, chain, {
+          balance: snapshot.close.balance,
+          quoteRate: snapshot.quote_rate,
+          valueUsd: snapshot.close.quote,
+          logoUrl: item.logo_url,
+        }),
+      );
+    }
+    return tokens;
+  }
+
+  async function fetchChainBalances(chain, address, date, key) {
+    if (!date) return fetchCurrentBalances(chain, address, key);
+    try {
+      return await fetchHistoricalBalances(chain, address, date, key);
+    } catch (err) {
+      if (err instanceof GoldRushError && err.upstreamCode === 501) {
+        return fetchHistoricalViaSnapshots(chain, address, date, key);
+      }
+      throw err;
+    }
+  }
+
+  async function getPortfolio(address, date, key) {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (date && date > todayStr) {
+      throw new GoldRushError("Date cannot be in the future.", 400);
+    }
+
+    const results = await Promise.allSettled(
+      CHAINS.map((chain) => fetchChainBalances(chain, address, date, key)),
+    );
+
+    const chainErrors = [];
+    const chainBreakdown = [];
+    const tokens = [];
+
+    results.forEach((result, i) => {
+      const chain = CHAINS[i];
+      if (result.status === "fulfilled") {
+        tokens.push(...result.value);
+        chainBreakdown.push({
+          chainId: chain.chainId,
+          chainLabel: chain.label,
+          valueUsd: result.value.reduce((sum, t) => sum + t.valueUsd, 0),
+        });
+      } else {
+        const message = result.reason instanceof Error ? result.reason.message : "Failed to load this chain.";
+        chainErrors.push({ chainId: chain.chainId, chainLabel: chain.label, message });
+      }
+    });
+
+    if (chainBreakdown.length === 0) {
+      throw new GoldRushError(chainErrors.map((e) => `${e.chainLabel}: ${e.message}`).join("; "), 502);
+    }
+
+    return {
+      address,
+      date: date || todayStr,
+      totalValueUsd: tokens.reduce((sum, t) => sum + t.valueUsd, 0),
+      tokens,
+      chainBreakdown,
+      chainErrors,
+    };
+  }
+
+  // --- validation / formatting (mirrors lib/validation.ts + lib/format.ts) ---
+
+  const ETH_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
+  function isValidEthAddress(address) {
+    return ETH_ADDRESS_REGEX.test(address);
+  }
+
+  function formatUsd(value) {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
+  }
+
+  function formatTokenAmount(rawBalance, decimals) {
+    const value = Number(rawBalance) / 10 ** decimals;
+    if (!Number.isFinite(value)) return "0";
+    return new Intl.NumberFormat("en-US", { maximumFractionDigits: value < 1 ? 6 : 4 }).format(value);
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // --- rendering ---
+
+  function renderMessage(type, text) {
+    messagesEl.innerHTML = `<p class="banner ${type}">${escapeHtml(text)}</p>`;
+  }
+
+  function clearMessage() {
+    messagesEl.innerHTML = "";
+  }
+
+  function renderPortfolio(portfolio) {
+    const sortedTokens = [...portfolio.tokens].sort((a, b) => b.valueUsd - a.valueUsd);
+
+    const pills = portfolio.chainBreakdown
+      .map((c) => `<div class="pill">${escapeHtml(c.chainLabel)}: ${formatUsd(c.valueUsd)}</div>`)
+      .join("");
+
+    const warn = portfolio.chainErrors.length
+      ? `<p class="banner warn">Couldn't load: ${escapeHtml(
+          portfolio.chainErrors.map((e) => `${e.chainLabel} (${e.message})`).join(", "),
+        )}</p>`
+      : "";
+
+    const rows = sortedTokens.length
+      ? sortedTokens
+          .map(
+            (t) => `
+        <tr>
+          <td>
+            <div style="font-weight:500;">${escapeHtml(t.symbol)}</div>
+            <div class="token-name">${escapeHtml(t.name)}</div>
+          </td>
+          <td>${escapeHtml(t.chainLabel)}</td>
+          <td>${formatTokenAmount(t.balance, t.decimals)}</td>
+          <td>${t.quoteRate != null ? formatUsd(t.quoteRate) : "—"}</td>
+          <td>${formatUsd(t.valueUsd)}</td>
+        </tr>`,
+          )
+          .join("")
+      : "";
+
+    const tableOrEmpty = sortedTokens.length
+      ? `<div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Token</th><th>Chain</th><th>Balance</th><th>Price</th><th>Value</th></tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`
+      : `<p class="empty">No token balances found for this address on this date.</p>`;
+
+    resultsEl.innerHTML = `
+      <div class="card">
+        <div class="total-label">Total value on ${escapeHtml(portfolio.date)}</div>
+        <div class="total-value">${formatUsd(portfolio.totalValueUsd)}</div>
+        <div class="pills">${pills}</div>
+      </div>
+      ${warn}
+      ${tableOrEmpty}
+    `;
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    clearMessage();
+    resultsEl.innerHTML = "";
+
+    const key = apiKeyInput.value.trim();
+    const address = addressInput.value.trim();
+    const date = dateInput.value;
+
+    if (!key) {
+      renderMessage("err", "Enter your GoldRush API key above first.");
+      return;
+    }
+    if (!isValidEthAddress(address)) {
+      renderMessage("err", "Enter a valid Ethereum address (0x followed by 40 hex characters).");
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Loading…";
+    try {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const portfolio = await getPortfolio(address, date === todayStr ? undefined : date, key);
+      renderPortfolio(portfolio);
+    } catch (err) {
+      renderMessage("err", err instanceof Error ? err.message : "Failed to load portfolio.");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "View portfolio";
+    }
+  });
+})();
+</script>
+</body>
+</html>
