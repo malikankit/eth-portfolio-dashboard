@@ -19,6 +19,8 @@
     --warn-fg: #92400e;
     --err-bg: #fef2f2;
     --err-fg: #b91c1c;
+    --ok-bg: #f0fdf4;
+    --ok-fg: #15803d;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -34,6 +36,8 @@
       --warn-fg: #fcd34d;
       --err-bg: #450a0a;
       --err-fg: #fca5a5;
+      --ok-bg: #052e16;
+      --ok-fg: #86efac;
     }
   }
   * { box-sizing: border-box; }
@@ -47,10 +51,13 @@
     justify-content: center;
     padding: 4rem 1rem;
   }
-  main { width: 100%; max-width: 48rem; display: flex; flex-direction: column; gap: 2rem; }
+  main { width: 100%; max-width: 64rem; display: flex; flex-direction: column; gap: 2rem; }
   h1 { font-size: 1.5rem; font-weight: 600; text-align: center; margin: 0; }
+  h2 { font-size: 1rem; font-weight: 600; margin: 0; }
   .subtitle { font-size: 0.875rem; color: var(--muted); text-align: center; margin: 0.5rem 0 0; }
   header { display: flex; flex-direction: column; align-items: center; }
+  section { display: flex; flex-direction: column; gap: 0.75rem; }
+  .section-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
   fieldset {
     border: 1px solid var(--border);
     border-radius: 0.5rem;
@@ -61,7 +68,7 @@
   }
   legend { font-size: 0.8rem; font-weight: 600; color: var(--muted); padding: 0 0.4rem; }
   label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.875rem; font-weight: 500; }
-  input, select {
+  input, select, textarea {
     border: 1px solid var(--border);
     background: var(--card);
     color: var(--fg);
@@ -70,9 +77,11 @@
     font-size: 0.875rem;
     font-family: inherit;
   }
-  input[type="text"].mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  textarea { resize: vertical; min-height: 3.5rem; }
+  input[type="text"].mono, textarea.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   .row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; }
   .row > label { flex: 1; min-width: 12rem; }
+  .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0.75rem; }
   button {
     border: none;
     border-radius: 0.375rem;
@@ -86,10 +95,13 @@
   }
   button:disabled { opacity: 0.5; cursor: default; }
   button.secondary { background: transparent; color: var(--fg); border: 1px solid var(--border); }
+  button.small { padding: 0.3rem 0.6rem; font-size: 0.75rem; background: transparent; color: var(--fg); border: 1px solid var(--border); }
+  button.danger { color: var(--err-fg); border-color: var(--err-fg); }
   .hint { font-size: 0.75rem; color: var(--muted); }
   .banner { border-radius: 0.375rem; padding: 0.6rem 1rem; font-size: 0.875rem; }
   .banner.warn { background: var(--warn-bg); color: var(--warn-fg); }
   .banner.err { background: var(--err-bg); color: var(--err-fg); }
+  .banner.ok { background: var(--ok-bg); color: var(--ok-fg); }
   .card { border: 1px solid var(--border); border-radius: 0.5rem; padding: 1rem; background: var(--card); }
   .total-label { font-size: 0.875rem; color: var(--muted); }
   .total-value { font-size: 1.9rem; font-weight: 600; }
@@ -97,7 +109,7 @@
   .pill { background: var(--pill); border-radius: 0.375rem; padding: 0.25rem 0.6rem; font-size: 0.75rem; color: var(--muted); }
   table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
   thead { background: var(--pill); color: var(--muted); }
-  th, td { padding: 0.5rem 1rem; text-align: left; }
+  th, td { padding: 0.5rem 0.75rem; text-align: left; vertical-align: middle; }
   th:last-child, td:last-child { text-align: right; }
   tbody tr { border-top: 1px solid var(--border); }
   .token-name { font-size: 0.75rem; color: var(--muted); }
@@ -105,6 +117,14 @@
   .empty { font-size: 0.875rem; color: var(--muted); }
   .status-line { font-size: 0.75rem; color: var(--muted); }
   details summary { cursor: pointer; font-size: 0.8rem; color: var(--muted); }
+  .cell-input { width: 100%; min-width: 5.5rem; padding: 0.35rem 0.5rem; font-size: 0.8rem; }
+  .cell-hint { font-size: 0.68rem; color: var(--muted); margin-top: 0.15rem; }
+  .actions-cell { display: flex; gap: 0.35rem; flex-wrap: wrap; justify-content: flex-end; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  tr.spam-row { background: var(--err-bg); }
+  tr.spam-row td { opacity: 0.85; }
+  .badge-spam { display: inline-block; font-size: 0.65rem; font-weight: 600; color: var(--err-fg); border: 1px solid var(--err-fg); border-radius: 0.25rem; padding: 0.05rem 0.3rem; margin-left: 0.4rem; }
+  .select-col { width: 2rem; text-align: center; }
 </style>
 </head>
 <body>
@@ -130,6 +150,12 @@
       <code>api.covalenthq.com</code>. Anyone with access to this browser/tab can read it, so don't use this
       file on a shared or public machine with a production key.
     </p>
+    <p class="hint">
+      If requests fail with a CORS-flavored error but the "Test connection" button also fails outright
+      (DevTools shows a bare <code>403</code> straight from Cloudflare, not a missing-header CORS message):
+      that's Cloudflare's Bot Management flagging your network, not a code issue. VPN/proxy exit IPs get hit
+      by this often. Try disconnecting your VPN or switching networks — confirmed to fix it in practice.
+    </p>
     <p id="corsResult" class="status-line"></p>
   </fieldset>
 
@@ -148,7 +174,97 @@
   </form>
 
   <div id="messages"></div>
-  <div id="results"></div>
+  <div id="summary"></div>
+
+  <section id="reviewSection" style="display:none;">
+    <div class="section-header">
+      <h2>Review &amp; verify</h2>
+      <p class="hint" id="reviewSubtitle"></p>
+    </div>
+    <p class="hint">
+      Eyeball the data below, correct anything that looks wrong, and add notes. Untick tokens that aren't
+      relevant (spam/airdropped junk) — only <strong>selected</strong> tokens are carried into the confirmed
+      entry; the recent-lookups cache above always keeps everything, unfiltered. Nothing here is saved until you
+      click <strong>Confirm &amp; save</strong>.
+    </p>
+    <div class="row">
+      <button type="button" id="selectAllBtn" class="secondary">Select all</button>
+      <button type="button" id="deselectAllBtn" class="secondary">Deselect all</button>
+      <span class="hint" id="reviewSelectionCount"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th class="select-col">Keep</th><th>Ticker</th><th>Chain</th><th>Amount</th><th>Price (USD)</th><th>Value (USD)</th><th>Notes</th><th>Spam?</th></tr>
+        </thead>
+        <tbody id="reviewTableBody"></tbody>
+      </table>
+    </div>
+    <datalist id="chainOptions">
+      <option value="Ethereum"></option>
+      <option value="Base"></option>
+      <option value="Arbitrum"></option>
+    </datalist>
+
+    <fieldset>
+      <legend>Address metadata</legend>
+      <div class="grid-3">
+        <label>External label
+          <input type="text" id="metaExternal" placeholder="e.g. known exchange name" />
+        </label>
+        <label>Internal label
+          <input type="text" id="metaInternal" placeholder="e.g. your own name for this wallet" />
+        </label>
+        <label>Cluster
+          <input type="text" id="metaCluster" placeholder="e.g. wallet group / entity" />
+        </label>
+      </div>
+    </fieldset>
+
+    <label>
+      Confirmation note (auto-fills with detected changes if left blank)
+      <textarea id="confirmNote" placeholder="Leave blank to auto-generate from your edits above."></textarea>
+    </label>
+    <div class="row">
+      <button type="button" id="autoNoteBtn" class="secondary">Auto-fill note from changes</button>
+      <button type="button" id="resetReviewBtn" class="secondary">Reset to fetched values</button>
+      <button type="button" id="confirmBtn">Confirm &amp; save</button>
+    </div>
+    <p class="hint">
+      Saving keys the entry by the address + date shown above. Re-confirming the same pair overwrites that entry;
+      changing either field before confirming saves it as a separate entry instead.
+    </p>
+  </section>
+
+  <section>
+    <div class="section-header">
+      <h2>Known spam tokens <span class="hint" id="spamCount"></span></h2>
+      <button type="button" id="clearSpam" class="small danger">Clear all</button>
+    </div>
+    <p class="hint">
+      Tokens you've marked spam in the review table, remembered across all addresses/dates in this browser.
+      They show up flagged (and deselected by default) whenever they appear again.
+    </p>
+    <div id="spamList"></div>
+  </section>
+
+  <section>
+    <div class="section-header">
+      <h2>Recent lookups <span class="hint" id="rawCacheCount"></span></h2>
+      <button type="button" id="clearRawCache" class="small danger">Clear all</button>
+    </div>
+    <p class="hint">Every fetch is cached here (address + date + full result) so re-viewing it doesn't hit the API again.</p>
+    <div id="rawCacheList"></div>
+  </section>
+
+  <section>
+    <div class="section-header">
+      <h2>Confirmed lookup history <span class="hint" id="confirmedCount"></span></h2>
+      <button type="button" id="clearConfirmed" class="small danger">Clear all</button>
+    </div>
+    <p class="hint">Manually verified entries, with your labels/edits/notes. Export any entry as CSV or JSON.</p>
+    <div id="confirmedList"></div>
+  </section>
 </main>
 
 <script>
@@ -162,7 +278,11 @@
     { id: "base-mainnet", chainId: 8453, label: "Base" },
     { id: "arbitrum-mainnet", chainId: 42161, label: "Arbitrum" },
   ];
-  const STORAGE_KEY = "goldrush_api_key";
+  const API_KEY_STORAGE = "goldrush_api_key";
+  const RAW_CACHE_STORAGE = "portfolio_lookup_cache_v1";
+  const CONFIRMED_STORAGE = "portfolio_confirmed_lookups_v1";
+  const SPAM_STORAGE = "portfolio_spam_tokens_v1";
+  const RAW_CACHE_LIMIT = 30;
 
   const $ = (id) => document.getElementById(id);
   const apiKeyInput = $("apiKey");
@@ -171,21 +291,42 @@
   const form = $("portfolioForm");
   const submitBtn = $("submitBtn");
   const messagesEl = $("messages");
-  const resultsEl = $("results");
+  const summaryEl = $("summary");
   const corsResultEl = $("corsResult");
+
+  const reviewSection = $("reviewSection");
+  const reviewSubtitle = $("reviewSubtitle");
+  const reviewTableBody = $("reviewTableBody");
+  const metaExternal = $("metaExternal");
+  const metaInternal = $("metaInternal");
+  const metaCluster = $("metaCluster");
+  const confirmNoteInput = $("confirmNote");
+  const confirmBtn = $("confirmBtn");
+  const autoNoteBtn = $("autoNoteBtn");
+  const resetReviewBtn = $("resetReviewBtn");
+
+  const rawCacheListEl = $("rawCacheList");
+  const rawCacheCountEl = $("rawCacheCount");
+  const confirmedListEl = $("confirmedList");
+  const confirmedCountEl = $("confirmedCount");
+  const spamListEl = $("spamList");
+  const spamCountEl = $("spamCount");
+  const selectAllBtn = $("selectAllBtn");
+  const deselectAllBtn = $("deselectAllBtn");
+  const reviewSelectionCount = $("reviewSelectionCount");
 
   dateInput.max = new Date().toISOString().slice(0, 10);
   dateInput.value = dateInput.max;
 
-  const savedKey = localStorage.getItem(STORAGE_KEY);
+  const savedKey = localStorage.getItem(API_KEY_STORAGE);
   if (savedKey) apiKeyInput.value = savedKey;
 
   $("saveKey").addEventListener("click", () => {
-    localStorage.setItem(STORAGE_KEY, apiKeyInput.value.trim());
+    localStorage.setItem(API_KEY_STORAGE, apiKeyInput.value.trim());
     corsResultEl.textContent = "Key saved to localStorage.";
   });
   $("clearKey").addEventListener("click", () => {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(API_KEY_STORAGE);
     apiKeyInput.value = "";
     corsResultEl.textContent = "Key cleared.";
   });
@@ -208,8 +349,13 @@
         `GoldRush sends permissive CORS headers, so this file can call the API with no proxy.`;
     } catch (err) {
       corsResultEl.textContent =
-        "Request failed before a response was readable — this usually means an actual CORS/network " +
-        "block rather than an API error (API errors like 401 still return normally): " + err.message;
+        "Request failed before any response was readable (" + err.message + "). GoldRush's API sends " +
+        "permissive CORS headers on every response we've tested (including from this exact origin), so a " +
+        "failure here almost always means something local intercepted the request before it reached the " +
+        "server — a browser extension (ad/privacy blocker), corporate VPN/DNS filtering, or antivirus TLS " +
+        "inspection. Check DevTools → Network for the OPTIONS request to api.covalenthq.com: if it shows " +
+        "'(failed) net::ERR_FAILED' with no status code, that confirms it never reached the server. Try an " +
+        "incognito window with extensions disabled, or a different network.";
     }
   });
 
@@ -312,7 +458,7 @@
 
     const data = await callGoldRush(
       `/${chain.id}/address/${address}/portfolio_v2/`,
-      { "quote-currency": "USD", days: String(Math.max(daysBack + 1, 1)) },
+      { "quote-currency": "USD", "no-spam": "true", days: String(Math.max(daysBack + 1, 1)) },
       key,
     );
 
@@ -395,20 +541,64 @@
   }
 
   function formatUsd(value) {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value ?? 0);
   }
 
-  function formatTokenAmount(rawBalance, decimals) {
-    const value = Number(rawBalance) / 10 ** decimals;
-    if (!Number.isFinite(value)) return "0";
-    return new Intl.NumberFormat("en-US", { maximumFractionDigits: value < 1 ? 6 : 4 }).format(value);
+  function formatNum(value) {
+    if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+    return new Intl.NumberFormat("en-US", { maximumFractionDigits: Math.abs(value) < 1 ? 6 : 4 }).format(value);
   }
 
   function escapeHtml(str) {
-    return String(str).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
-  // --- rendering ---
+  function escapeAttr(v) {
+    return escapeHtml(v === null || v === undefined ? "" : v);
+  }
+
+  function shortAddr(addr) {
+    return addr.length > 12 ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : addr;
+  }
+
+  function parseNum(str) {
+    if (str === null || str === undefined) return null;
+    const s = String(str).trim();
+    if (s === "") return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function entryKey(address, date) {
+    return `${address.toLowerCase()}::${date}`;
+  }
+
+  function loadJSON(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  function saveJSON(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function downloadBlob(filename, content, mime) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // --- messages / summary ---
 
   function renderMessage(type, text) {
     messagesEl.innerHTML = `<p class="banner ${type}">${escapeHtml(text)}</p>`;
@@ -418,63 +608,611 @@
     messagesEl.innerHTML = "";
   }
 
-  function renderPortfolio(portfolio) {
-    const sortedTokens = [...portfolio.tokens].sort((a, b) => b.valueUsd - a.valueUsd);
-
+  function renderSummary(portfolio) {
     const pills = portfolio.chainBreakdown
       .map((c) => `<div class="pill">${escapeHtml(c.chainLabel)}: ${formatUsd(c.valueUsd)}</div>`)
       .join("");
-
     const warn = portfolio.chainErrors.length
       ? `<p class="banner warn">Couldn't load: ${escapeHtml(
           portfolio.chainErrors.map((e) => `${e.chainLabel} (${e.message})`).join(", "),
         )}</p>`
       : "";
-
-    const rows = sortedTokens.length
-      ? sortedTokens
-          .map(
-            (t) => `
-        <tr>
-          <td>
-            <div style="font-weight:500;">${escapeHtml(t.symbol)}</div>
-            <div class="token-name">${escapeHtml(t.name)}</div>
-          </td>
-          <td>${escapeHtml(t.chainLabel)}</td>
-          <td>${formatTokenAmount(t.balance, t.decimals)}</td>
-          <td>${t.quoteRate != null ? formatUsd(t.quoteRate) : "—"}</td>
-          <td>${formatUsd(t.valueUsd)}</td>
-        </tr>`,
-          )
-          .join("")
-      : "";
-
-    const tableOrEmpty = sortedTokens.length
-      ? `<div class="table-wrap">
-          <table>
-            <thead>
-              <tr><th>Token</th><th>Chain</th><th>Balance</th><th>Price</th><th>Value</th></tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>`
-      : `<p class="empty">No token balances found for this address on this date.</p>`;
-
-    resultsEl.innerHTML = `
+    summaryEl.innerHTML = `
       <div class="card">
         <div class="total-label">Total value on ${escapeHtml(portfolio.date)}</div>
         <div class="total-value">${formatUsd(portfolio.totalValueUsd)}</div>
         <div class="pills">${pills}</div>
       </div>
       ${warn}
-      ${tableOrEmpty}
     `;
   }
+
+  function renderSummaryFromConfirmed(entry) {
+    summaryEl.innerHTML = `
+      <div class="card">
+        <div class="total-label">Editing confirmed entry — last saved ${escapeHtml(new Date(entry.confirmedAt).toLocaleString())}</div>
+        <div class="total-value">${formatUsd(entry.totalValueUsd)}</div>
+      </div>
+    `;
+  }
+
+  // --- global spam token list ---
+
+  let spamTokens = loadJSON(SPAM_STORAGE, []);
+
+  function spamMatchKey(chainId, contractAddress) {
+    return `${chainId}::${String(contractAddress || "").toLowerCase()}`;
+  }
+
+  function isSpamToken(chainId, contractAddress) {
+    if (!contractAddress) return false;
+    const key = spamMatchKey(chainId, contractAddress);
+    return spamTokens.some((t) => spamMatchKey(t.chainId, t.contractAddress) === key);
+  }
+
+  function addSpamToken(chainId, contractAddress, symbol, chainLabel) {
+    if (!contractAddress) return;
+    const key = spamMatchKey(chainId, contractAddress);
+    spamTokens = spamTokens.filter((t) => spamMatchKey(t.chainId, t.contractAddress) !== key);
+    spamTokens.push({ chainId, contractAddress, symbol, chainLabel, markedAt: new Date().toISOString() });
+    saveJSON(SPAM_STORAGE, spamTokens);
+    renderSpamList();
+  }
+
+  function removeSpamToken(chainId, contractAddress) {
+    const key = spamMatchKey(chainId, contractAddress);
+    spamTokens = spamTokens.filter((t) => spamMatchKey(t.chainId, t.contractAddress) !== key);
+    saveJSON(SPAM_STORAGE, spamTokens);
+    renderSpamList();
+  }
+
+  function renderSpamList() {
+    spamCountEl.textContent = spamTokens.length ? `(${spamTokens.length})` : "";
+    if (!spamTokens.length) {
+      spamListEl.innerHTML = `<p class="empty">No tokens marked as spam yet — use the "Spam?" column in the review table below.</p>`;
+      return;
+    }
+    const sorted = [...spamTokens].sort((a, b) => b.markedAt.localeCompare(a.markedAt));
+    const rows = sorted
+      .map(
+        (t) => `
+      <tr>
+        <td>${escapeHtml(t.chainLabel || t.chainId)}</td>
+        <td class="mono">${escapeHtml(shortAddr(t.contractAddress))}</td>
+        <td>${escapeHtml(t.symbol || "?")}</td>
+        <td>${escapeHtml(new Date(t.markedAt).toLocaleString())}</td>
+        <td>
+          <button type="button" class="small" data-unspam-chain="${escapeAttr(t.chainId)}" data-unspam-address="${escapeAttr(t.contractAddress)}">Unmark</button>
+        </td>
+      </tr>`,
+      )
+      .join("");
+    spamListEl.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Chain</th><th>Contract</th><th>Symbol</th><th>Marked at</th><th></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  spamListEl.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-unspam-address]");
+    if (!btn) return;
+    removeSpamToken(Number(btn.dataset.unspamChain), btn.dataset.unspamAddress);
+    renderReviewTable();
+  });
+
+  $("clearSpam").addEventListener("click", () => {
+    if (!spamTokens.length) return;
+    if (!confirm("Clear the entire global spam-token list?")) return;
+    spamTokens = [];
+    saveJSON(SPAM_STORAGE, spamTokens);
+    renderSpamList();
+    renderReviewTable();
+  });
+
+  // --- review / verify workflow ---
+
+  let reviewRows = [];
+
+  function buildReviewRowsFromPortfolio(portfolio) {
+    const sorted = [...portfolio.tokens].sort((a, b) => b.valueUsd - a.valueUsd);
+    return sorted.map((t) => {
+      const amount = Number(t.balance) / 10 ** t.decimals;
+      const original = { ticker: t.symbol, chain: t.chainLabel, amount, price: t.quoteRate, value: t.valueUsd };
+      const spam = isSpamToken(t.chainId, t.contractAddress);
+      return {
+        original,
+        ticker: t.symbol,
+        chain: t.chainLabel,
+        amount,
+        price: t.quoteRate,
+        value: t.valueUsd,
+        notes: "",
+        contractAddress: t.contractAddress,
+        chainId: t.chainId,
+        selected: !spam,
+      };
+    });
+  }
+
+  function buildReviewRowsFromConfirmed(entry) {
+    return entry.tokens.map((t) => {
+      const chainId = t.chainId ?? null;
+      const contractAddress = t.contractAddress ?? null;
+      return {
+        original: { ticker: t.ticker, chain: t.chain, amount: t.amount, price: t.price, value: t.value },
+        ticker: t.ticker,
+        chain: t.chain,
+        amount: t.amount,
+        price: t.price,
+        value: t.value,
+        notes: t.notes || "",
+        contractAddress,
+        chainId,
+        selected: t.selected !== undefined ? t.selected : !isSpamToken(chainId, contractAddress),
+      };
+    });
+  }
+
+  function renderReviewTable() {
+    if (!reviewRows.length) {
+      reviewTableBody.innerHTML = `<tr><td colspan="8" class="empty">No token balances for this address/date — you can still label the address and confirm an empty entry.</td></tr>`;
+      reviewSelectionCount.textContent = "";
+      return;
+    }
+    reviewTableBody.innerHTML = reviewRows
+      .map((r, i) => {
+        const spam = isSpamToken(r.chainId, r.contractAddress);
+        return `
+      <tr class="${spam ? "spam-row" : ""}">
+        <td class="select-col"><input type="checkbox" id="rev-select-${i}" ${r.selected ? "checked" : ""} /></td>
+        <td>
+          <input type="text" class="cell-input" id="rev-ticker-${i}" value="${escapeAttr(r.ticker)}" />
+          ${spam ? `<span class="badge-spam">SPAM</span>` : ""}
+        </td>
+        <td><input type="text" class="cell-input" id="rev-chain-${i}" list="chainOptions" value="${escapeAttr(r.chain)}" /></td>
+        <td>
+          <input type="text" class="cell-input mono" id="rev-amount-${i}" value="${escapeAttr(r.amount ?? "")}" />
+          <div class="cell-hint">fetched: ${formatNum(r.original.amount)}</div>
+        </td>
+        <td>
+          <input type="text" class="cell-input mono" id="rev-price-${i}" value="${escapeAttr(r.price ?? "")}" />
+          <div class="cell-hint">fetched: ${r.original.price != null ? formatNum(r.original.price) : "—"}</div>
+        </td>
+        <td>
+          <input type="text" class="cell-input mono" id="rev-value-${i}" value="${escapeAttr(r.value ?? "")}" />
+          <div class="cell-hint">fetched: ${formatUsd(r.original.value)}</div>
+        </td>
+        <td><input type="text" class="cell-input" id="rev-notes-${i}" placeholder="notes" value="${escapeAttr(r.notes)}" /></td>
+        <td>
+          <button type="button" class="small ${spam ? "danger" : "secondary"}" data-spam-toggle="${i}">
+            ${spam ? "Unmark spam" : "Mark spam"}
+          </button>
+        </td>
+      </tr>`;
+      })
+      .join("");
+    updateSelectionCount();
+  }
+
+  function updateSelectionCount() {
+    const selected = reviewRows.filter((r) => r.selected).length;
+    reviewSelectionCount.textContent = `${selected} of ${reviewRows.length} tokens selected for the confirmed entry`;
+  }
+
+  reviewTableBody.addEventListener("change", (e) => {
+    if (e.target.matches('input[type="checkbox"][id^="rev-select-"]')) {
+      const i = Number(e.target.id.replace("rev-select-", ""));
+      if (reviewRows[i]) reviewRows[i].selected = e.target.checked;
+      updateSelectionCount();
+    }
+  });
+
+  reviewTableBody.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-spam-toggle]");
+    if (!btn) return;
+    const i = Number(btn.dataset.spamToggle);
+    syncReviewRowsFromDom();
+    const r = reviewRows[i];
+    if (!r.contractAddress) {
+      renderMessage("warn", "Can't mark this row as spam — it has no contract address on record (likely from an older confirmed entry saved before this feature).");
+      return;
+    }
+    if (isSpamToken(r.chainId, r.contractAddress)) {
+      removeSpamToken(r.chainId, r.contractAddress);
+    } else {
+      addSpamToken(r.chainId, r.contractAddress, r.ticker, r.chain);
+      r.selected = false;
+    }
+    renderReviewTable();
+  });
+
+  selectAllBtn.addEventListener("click", () => {
+    syncReviewRowsFromDom();
+    reviewRows = reviewRows.map((r) => ({ ...r, selected: true }));
+    renderReviewTable();
+  });
+
+  deselectAllBtn.addEventListener("click", () => {
+    syncReviewRowsFromDom();
+    reviewRows = reviewRows.map((r) => ({ ...r, selected: false }));
+    renderReviewTable();
+  });
+
+  function findLatestConfirmedForAddress(address) {
+    const matches = confirmedEntries.filter((e) => e.address.toLowerCase() === address.toLowerCase());
+    if (!matches.length) return null;
+    return matches.reduce((a, b) => (a.confirmedAt > b.confirmedAt ? a : b));
+  }
+
+  function openReview(portfolio) {
+    reviewRows = buildReviewRowsFromPortfolio(portfolio);
+    reviewSubtitle.textContent = `${portfolio.address} — ${portfolio.date}`;
+    renderReviewTable();
+
+    const prior = findLatestConfirmedForAddress(portfolio.address);
+    metaExternal.value = prior?.addressMeta.externalLabel || "";
+    metaInternal.value = prior?.addressMeta.internalLabel || "";
+    metaCluster.value = prior?.addressMeta.cluster || "";
+    confirmNoteInput.value = "";
+    if (prior) {
+      renderMessage("ok", `Prefilled address labels from your confirmed lookup of this address on ${prior.date}. Edit if this date's data differs.`);
+    }
+
+    reviewSection.style.display = "flex";
+  }
+
+  function openReviewFromConfirmed(entry) {
+    addressInput.value = entry.address;
+    dateInput.value = entry.date;
+    reviewRows = buildReviewRowsFromConfirmed(entry);
+    reviewSubtitle.textContent = `${entry.address} — ${entry.date} (editing confirmed entry)`;
+    renderReviewTable();
+    metaExternal.value = entry.addressMeta.externalLabel || "";
+    metaInternal.value = entry.addressMeta.internalLabel || "";
+    metaCluster.value = entry.addressMeta.cluster || "";
+    confirmNoteInput.value = "";
+    renderSummaryFromConfirmed(entry);
+    reviewSection.style.display = "flex";
+    reviewSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function syncReviewRowsFromDom() {
+    reviewRows = reviewRows.map((r, i) => ({
+      ...r,
+      ticker: (dom(`rev-ticker-${i}`)?.value ?? r.ticker).trim(),
+      chain: (dom(`rev-chain-${i}`)?.value ?? r.chain).trim(),
+      amount: parseNum(dom(`rev-amount-${i}`)?.value),
+      price: parseNum(dom(`rev-price-${i}`)?.value),
+      value: parseNum(dom(`rev-value-${i}`)?.value),
+      notes: (dom(`rev-notes-${i}`)?.value ?? "").trim(),
+      selected: dom(`rev-select-${i}`)?.checked ?? r.selected,
+    }));
+  }
+
+  function dom(id) {
+    return document.getElementById(id);
+  }
+
+  function numChanged(a, b) {
+    if (a === null || a === undefined) a = null;
+    if (b === null || b === undefined) b = null;
+    if (a === null && b === null) return false;
+    if (a === null || b === null) return true;
+    return Math.abs(a - b) > 1e-9;
+  }
+
+  function buildAnnotationNote(rows, addressMeta) {
+    const lines = [];
+    for (const r of rows) {
+      const changes = [];
+      if (r.ticker !== r.original.ticker) changes.push(`ticker "${r.original.ticker}"→"${r.ticker}"`);
+      if (r.chain !== r.original.chain) changes.push(`chain "${r.original.chain}"→"${r.chain}"`);
+      if (numChanged(r.amount, r.original.amount)) changes.push(`amount ${formatNum(r.original.amount)}→${formatNum(r.amount)}`);
+      if (numChanged(r.price, r.original.price)) changes.push(`price ${r.original.price != null ? formatNum(r.original.price) : "—"}→${r.price != null ? formatNum(r.price) : "—"}`);
+      if (numChanged(r.value, r.original.value)) changes.push(`value ${formatUsd(r.original.value)}→${formatUsd(r.value)}`);
+      if (r.notes) changes.push(`note: "${r.notes}"`);
+      if (changes.length) lines.push(`${r.original.ticker} (${r.original.chain}): ${changes.join("; ")}`);
+    }
+    const metaBits = [];
+    if (addressMeta.externalLabel) metaBits.push(`external_label="${addressMeta.externalLabel}"`);
+    if (addressMeta.internalLabel) metaBits.push(`internal_label="${addressMeta.internalLabel}"`);
+    if (addressMeta.cluster) metaBits.push(`cluster="${addressMeta.cluster}"`);
+    if (metaBits.length) lines.push(`Address metadata: ${metaBits.join(", ")}`);
+    return lines.length ? lines.join(" | ") : "Confirmed as-is, no manual changes.";
+  }
+
+  autoNoteBtn.addEventListener("click", () => {
+    syncReviewRowsFromDom();
+    const addressMeta = {
+      externalLabel: metaExternal.value.trim(),
+      internalLabel: metaInternal.value.trim(),
+      cluster: metaCluster.value.trim(),
+    };
+    confirmNoteInput.value = buildAnnotationNote(reviewRows, addressMeta);
+  });
+
+  resetReviewBtn.addEventListener("click", () => {
+    reviewRows = reviewRows.map((r) => ({
+      ...r.original,
+      original: r.original,
+      notes: "",
+      contractAddress: r.contractAddress,
+      chainId: r.chainId,
+      selected: !isSpamToken(r.chainId, r.contractAddress),
+    }));
+    renderReviewTable();
+    confirmNoteInput.value = "";
+  });
+
+  confirmBtn.addEventListener("click", () => {
+    const address = addressInput.value.trim();
+    const date = dateInput.value;
+    if (!isValidEthAddress(address)) {
+      renderMessage("err", "Enter a valid Ethereum address before confirming.");
+      return;
+    }
+    if (!date) {
+      renderMessage("err", "Pick a date before confirming.");
+      return;
+    }
+
+    syncReviewRowsFromDom();
+    const addressMeta = {
+      externalLabel: metaExternal.value.trim(),
+      internalLabel: metaInternal.value.trim(),
+      cluster: metaCluster.value.trim(),
+    };
+
+    const keptRows = reviewRows.filter((r) => r.selected);
+    const excludedRows = reviewRows.filter((r) => !r.selected);
+
+    let autoNote = buildAnnotationNote(keptRows, addressMeta);
+    if (excludedRows.length) {
+      const excludedList = excludedRows.map((r) => `${r.original.ticker} (${r.original.chain})`).join(", ");
+      autoNote += ` | Excluded ${excludedRows.length} token(s) as not relevant: ${excludedList}`;
+    }
+    const noteText = confirmNoteInput.value.trim() || autoNote;
+    const totalValueUsd = keptRows.reduce((sum, r) => sum + (r.value || 0), 0);
+
+    const entry = {
+      key: entryKey(address, date),
+      address,
+      date,
+      confirmedAt: new Date().toISOString(),
+      addressMeta,
+      tokens: keptRows.map(({ original, ...rest }) => rest),
+      annotationNote: noteText,
+      totalValueUsd,
+    };
+
+    upsertConfirmed(entry);
+    renderMessage(
+      "ok",
+      `Saved confirmed lookup for ${shortAddr(address)} on ${date} — ${keptRows.length} of ${reviewRows.length} tokens kept.`,
+    );
+  });
+
+  // --- raw lookup cache (recent lookups) ---
+
+  let rawCache = loadJSON(RAW_CACHE_STORAGE, []);
+
+  function upsertRawCache(portfolio) {
+    const key = entryKey(portfolio.address, portfolio.date);
+    rawCache = rawCache.filter((e) => e.key !== key);
+    rawCache.unshift({ key, address: portfolio.address, date: portfolio.date, fetchedAt: new Date().toISOString(), portfolio });
+    if (rawCache.length > RAW_CACHE_LIMIT) rawCache = rawCache.slice(0, RAW_CACHE_LIMIT);
+    saveJSON(RAW_CACHE_STORAGE, rawCache);
+    renderRawCacheList();
+  }
+
+  function renderRawCacheList() {
+    rawCacheCountEl.textContent = rawCache.length ? `(${rawCache.length})` : "";
+    if (!rawCache.length) {
+      rawCacheListEl.innerHTML = `<p class="empty">No lookups yet — run one above.</p>`;
+      return;
+    }
+    const rows = rawCache
+      .map(
+        (e) => `
+      <tr>
+        <td class="mono">${escapeHtml(shortAddr(e.address))}</td>
+        <td>${escapeHtml(e.date)}</td>
+        <td>${escapeHtml(new Date(e.fetchedAt).toLocaleString())}</td>
+        <td>${formatUsd(e.portfolio.totalValueUsd)}</td>
+        <td>
+          <div class="actions-cell">
+            <button type="button" class="small" data-action="load" data-key="${escapeAttr(e.key)}">Load</button>
+            <button type="button" class="small danger" data-action="delete" data-key="${escapeAttr(e.key)}">Delete</button>
+          </div>
+        </td>
+      </tr>`,
+      )
+      .join("");
+    rawCacheListEl.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Address</th><th>Date</th><th>Fetched at</th><th>Total</th><th></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  rawCacheListEl.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const cacheEntry = rawCache.find((x) => x.key === btn.dataset.key);
+    if (!cacheEntry) return;
+    if (btn.dataset.action === "load") {
+      addressInput.value = cacheEntry.address;
+      dateInput.value = cacheEntry.date;
+      clearMessage();
+      renderSummary(cacheEntry.portfolio);
+      openReview(cacheEntry.portfolio);
+      renderMessage("ok", `Loaded from cache (fetched ${new Date(cacheEntry.fetchedAt).toLocaleString()}) — no API call made.`);
+    } else if (btn.dataset.action === "delete") {
+      if (!confirm(`Remove cached lookup for ${cacheEntry.address} on ${cacheEntry.date}?`)) return;
+      rawCache = rawCache.filter((x) => x.key !== cacheEntry.key);
+      saveJSON(RAW_CACHE_STORAGE, rawCache);
+      renderRawCacheList();
+    }
+  });
+
+  $("clearRawCache").addEventListener("click", () => {
+    if (!rawCache.length) return;
+    if (!confirm("Clear all recent lookups from this browser?")) return;
+    rawCache = [];
+    saveJSON(RAW_CACHE_STORAGE, rawCache);
+    renderRawCacheList();
+  });
+
+  // --- confirmed lookup history ---
+
+  let confirmedEntries = loadJSON(CONFIRMED_STORAGE, []);
+
+  function upsertConfirmed(entry) {
+    confirmedEntries = confirmedEntries.filter((e) => e.key !== entry.key);
+    confirmedEntries.push(entry);
+    saveJSON(CONFIRMED_STORAGE, confirmedEntries);
+    renderConfirmedList();
+  }
+
+  function csvCell(v) {
+    if (v === null || v === undefined) return "";
+    const s = String(v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function entryToCsv(entry) {
+    const header = ["date", "address", "external_label", "internal_label", "cluster", "ticker", "network", "amount", "price", "value", "notes", "manual_annotation_notes"];
+    const lines = [header.join(",")];
+    const tokenRows = entry.tokens.length ? entry.tokens : [{ ticker: "", chain: "", amount: "", price: "", value: "", notes: "" }];
+    for (const t of tokenRows) {
+      lines.push(
+        [
+          entry.date,
+          entry.address,
+          entry.addressMeta.externalLabel,
+          entry.addressMeta.internalLabel,
+          entry.addressMeta.cluster,
+          t.ticker,
+          t.chain,
+          t.amount ?? "",
+          t.price ?? "",
+          t.value ?? "",
+          t.notes,
+          entry.annotationNote,
+        ]
+          .map(csvCell)
+          .join(","),
+      );
+    }
+    return lines.join("\r\n");
+  }
+
+  function entryToJson(entry) {
+    return JSON.stringify(
+      {
+        address: entry.address,
+        date: entry.date,
+        confirmedAt: entry.confirmedAt,
+        addressMeta: entry.addressMeta,
+        annotationNote: entry.annotationNote,
+        totalValueUsd: entry.totalValueUsd,
+        tokens: entry.tokens.map((t) => ({
+          ticker: t.ticker,
+          chain: t.chain,
+          chain_id: t.chainId ?? null,
+          contract_address: t.contractAddress ?? null,
+          amount: t.amount,
+          price: t.price,
+          value: t.value,
+          notes: t.notes,
+        })),
+      },
+      null,
+      2,
+    );
+  }
+
+  function renderConfirmedList() {
+    confirmedCountEl.textContent = confirmedEntries.length ? `(${confirmedEntries.length})` : "";
+    if (!confirmedEntries.length) {
+      confirmedListEl.innerHTML = `<p class="empty">No confirmed lookups yet — review a lookup above and click "Confirm &amp; save".</p>`;
+      return;
+    }
+    const sorted = [...confirmedEntries].sort((a, b) => b.confirmedAt.localeCompare(a.confirmedAt));
+    const rows = sorted
+      .map(
+        (entry) => `
+      <tr>
+        <td class="mono">${escapeHtml(shortAddr(entry.address))}</td>
+        <td>${escapeHtml(entry.date)}</td>
+        <td>${escapeHtml(new Date(entry.confirmedAt).toLocaleString())}</td>
+        <td>${escapeHtml(entry.addressMeta.externalLabel || "—")}</td>
+        <td>${escapeHtml(entry.addressMeta.internalLabel || "—")}</td>
+        <td>${escapeHtml(entry.addressMeta.cluster || "—")}</td>
+        <td>${formatUsd(entry.totalValueUsd)}</td>
+        <td>
+          <div class="actions-cell">
+            <button type="button" class="small" data-action="edit" data-key="${escapeAttr(entry.key)}">Edit</button>
+            <button type="button" class="small" data-action="csv" data-key="${escapeAttr(entry.key)}">CSV</button>
+            <button type="button" class="small" data-action="json" data-key="${escapeAttr(entry.key)}">JSON</button>
+            <button type="button" class="small danger" data-action="delete" data-key="${escapeAttr(entry.key)}">Delete</button>
+          </div>
+        </td>
+      </tr>`,
+      )
+      .join("");
+    confirmedListEl.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Address</th><th>Date</th><th>Confirmed at</th><th>External</th><th>Internal</th><th>Cluster</th><th>Total</th><th></th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  confirmedListEl.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const entry = confirmedEntries.find((x) => x.key === btn.dataset.key);
+    if (!entry) return;
+    const action = btn.dataset.action;
+    if (action === "edit") {
+      clearMessage();
+      openReviewFromConfirmed(entry);
+    } else if (action === "csv") {
+      downloadBlob(`lookup_${entry.address}_${entry.date}.csv`, entryToCsv(entry), "text/csv");
+    } else if (action === "json") {
+      downloadBlob(`lookup_${entry.address}_${entry.date}.json`, entryToJson(entry), "application/json");
+    } else if (action === "delete") {
+      if (!confirm(`Delete confirmed lookup for ${entry.address} on ${entry.date}?`)) return;
+      confirmedEntries = confirmedEntries.filter((x) => x.key !== entry.key);
+      saveJSON(CONFIRMED_STORAGE, confirmedEntries);
+      renderConfirmedList();
+    }
+  });
+
+  $("clearConfirmed").addEventListener("click", () => {
+    if (!confirmedEntries.length) return;
+    if (!confirm("Clear all confirmed lookup history from this browser?")) return;
+    confirmedEntries = [];
+    saveJSON(CONFIRMED_STORAGE, confirmedEntries);
+    renderConfirmedList();
+  });
+
+  // --- main form ---
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     clearMessage();
-    resultsEl.innerHTML = "";
+    summaryEl.innerHTML = "";
+    reviewSection.style.display = "none";
 
     const key = apiKeyInput.value.trim();
     const address = addressInput.value.trim();
@@ -494,7 +1232,9 @@
     try {
       const todayStr = new Date().toISOString().slice(0, 10);
       const portfolio = await getPortfolio(address, date === todayStr ? undefined : date, key);
-      renderPortfolio(portfolio);
+      renderSummary(portfolio);
+      upsertRawCache(portfolio);
+      openReview(portfolio);
     } catch (err) {
       renderMessage("err", err instanceof Error ? err.message : "Failed to load portfolio.");
     } finally {
@@ -502,6 +1242,10 @@
       submitBtn.textContent = "View portfolio";
     }
   });
+
+  renderRawCacheList();
+  renderConfirmedList();
+  renderSpamList();
 })();
 </script>
 </body>
