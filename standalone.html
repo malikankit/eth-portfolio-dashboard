@@ -188,13 +188,14 @@
       click <strong>Confirm &amp; save</strong>.
     </p>
     <p class="hint">
-      <strong>Price (USD)</strong> is GoldRush/Covalent's own <code>quote_rate</code>, not CoinGecko's. For the
+      <strong>GoldRushFetchedPriceInUSD</strong> is GoldRush/Covalent's own <code>quote_rate</code>, not CoinGecko's. For the
       current date it's balances_v2's live quote; for a past date it's either historical_balances' quote at the
       block GoldRush resolved for that date, or (when that 501s) portfolio_v2's daily-snapshot close. Covalent
       doesn't expose an exact quote timestamp, and its aggregation/exchange sources differ from CoinGecko's — so
       a small mismatch, especially on volatile days, is expected rather than a bug. The raw response for every
       call (including whatever price fields GoldRush actually sent) is kept in the audit log below if you need to
-      double check what was fetched.
+      double check what was fetched. See the <strong>Notes</strong> section at the bottom of the page for the
+      full breakdown of how each side computes its price.
     </p>
     <div class="row">
       <button type="button" id="selectAllBtn" class="secondary">Select all</button>
@@ -204,7 +205,7 @@
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th class="select-col">Keep</th><th>Ticker</th><th>Chain</th><th>Amount</th><th>Price (USD)</th><th>Value (USD)</th><th>Notes</th><th>Spam?</th></tr>
+          <tr><th class="select-col">Keep</th><th>Ticker</th><th>Chain</th><th>Amount</th><th>GoldRushFetchedPriceInUSD</th><th>GoldRushFetchedValueInUSD</th><th>Notes</th><th>Spam?</th></tr>
         </thead>
         <tbody id="reviewTableBody"></tbody>
       </table>
@@ -289,6 +290,53 @@
     </div>
     <p class="hint">Manually verified entries, with your labels/edits/notes. Export any entry as CSV or JSON.</p>
     <div id="confirmedList"></div>
+  </section>
+
+  <section>
+    <div class="section-header">
+      <h2>Notes</h2>
+    </div>
+    <div class="card" style="display:flex; flex-direction:column; gap:0.75rem; font-size:0.875rem;">
+      <div>
+        <strong>How GoldRush's price (<code>GoldRushFetchedPriceInUSD</code>) is computed</strong>
+        <p class="hint" style="margin-top:0.25rem;">
+          We never calculate or interpolate a price ourselves — every price/value column is exactly what
+          GoldRush/Covalent's API returned. Two different code paths can produce it, depending on the chain and date:
+        </p>
+        <ul class="hint" style="margin:0.25rem 0 0; padding-left:1.25rem;">
+          <li><strong>Current date</strong> — <code>balances_v2</code>'s live <code>quote_rate</code>.</li>
+          <li><strong>Past date, chain supports it</strong> — <code>historical_balances</code>'s <code>quote_rate</code> at whatever block Covalent internally resolved for that date. The exact time-of-day for that block isn't exposed to us.</li>
+          <li><strong>Past date, chain 501s on the above (e.g. Arbitrum)</strong> — <code>portfolio_v2</code>'s daily-snapshot <code>quote_rate</code>, matched to the requested date (or the closest earlier snapshot if that exact day is missing).</li>
+        </ul>
+      </div>
+      <div>
+        <strong>How CoinGecko's price is computed</strong>
+        <p class="hint" style="margin-top:0.25rem;">CoinGecko uses a different methodology depending on which of their endpoints is used:</p>
+        <ul class="hint" style="margin:0.25rem 0 0; padding-left:1.25rem;">
+          <li><strong>Live/spot price</strong> (<code>/simple/price</code>) — a real-time, volume-weighted average across the exchanges CoinGecko tracks for that asset.</li>
+          <li><strong>Historical price for a specific date</strong> (<code>/coins/{id}/history</code>) — a snapshot taken at <strong>00:00 UTC</strong> on that date, also volume-weighted across tracked exchanges at that exact moment. Not an intraday average or close.</li>
+          <li><strong>Market chart / range data</strong> (<code>/coins/{id}/market_chart</code>) — daily granularity (effectively one point per UTC day) for longer ranges, hourly or finer for short ranges.</li>
+        </ul>
+      </div>
+      <div>
+        <strong>Why the numbers won't always match</strong>
+        <p class="hint" style="margin-top:0.25rem;">
+          CoinGecko's per-date number is almost always a 00:00 UTC volume-weighted snapshot. GoldRush's is either a
+          quote at an unspecified block/time (historical_balances) or an unspecified-time daily snapshot
+          (portfolio_v2) — neither is documented as a 00:00 UTC close. A small mismatch, larger on volatile days, is
+          expected and not a bug. Use the <strong>Audit log</strong> section above to see the exact raw
+          <code>quote_rate</code> GoldRush returned for any lookup if you need to reconcile the two.
+        </p>
+      </div>
+      <div>
+        <strong>A note on exports</strong>
+        <p class="hint" style="margin-top:0.25rem;">
+          Price/value columns are labeled <code>GoldRushFetchedPriceInUSD</code> / <code>GoldRushFetchedValueInUSD</code>
+          in the review table, CSV export, and JSON export to make clear these are values as fetched from GoldRush,
+          not a verified or authoritative price — whether to actually use this data downstream is up to you.
+        </p>
+      </div>
+    </div>
   </section>
 </main>
 
@@ -1192,7 +1240,7 @@
   }
 
   function entryToCsv(entry) {
-    const header = ["date", "address", "external_label", "internal_label", "cluster", "ticker", "network", "amount", "price", "value", "notes", "manual_annotation_notes"];
+    const header = ["date", "address", "external_label", "internal_label", "cluster", "ticker", "network", "amount", "GoldRushFetchedPriceInUSD", "GoldRushFetchedValueInUSD", "notes", "manual_annotation_notes"];
     const lines = [header.join(",")];
     const tokenRows = entry.tokens.length ? entry.tokens : [{ ticker: "", chain: "", amount: "", price: "", value: "", notes: "" }];
     for (const t of tokenRows) {
@@ -1233,8 +1281,8 @@
           chain_id: t.chainId ?? null,
           contract_address: t.contractAddress ?? null,
           amount: t.amount,
-          price: t.price,
-          value: t.value,
+          GoldRushFetchedPriceInUSD: t.price,
+          GoldRushFetchedValueInUSD: t.value,
           notes: t.notes,
         })),
       },
